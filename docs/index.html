@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pi 5 Person Detector</title>
+<style>
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url(fonts/Archivo-600.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 800;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url(fonts/Archivo-800.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/IBMPlexMono-400.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(fonts/IBMPlexMono-500.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url(fonts/IBMPlexSans-400.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url(fonts/IBMPlexSans-500.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url(fonts/IBMPlexSans-600.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* Layout: single reading column (~72ch) with full-width pipeline strip and tables that scroll inside their own boxes */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --fg: #1a2130;
+  --muted: #5a6475;
+  --line: #d9dde5;
+  --accent: #2459c2;      /* signal blue */
+  --box: #c97a0e;         /* bounding-box amber */
+  --ok: #1f7a4d;
+  --warn: #a8640a;
+  --crit: #b3322a;
+  --ok-bg: #e5f3eb;
+  --warn-bg: #fbf0dc;
+  --crit-bg: #f9e3e1;
+  --code-bg: #eceff4;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --surface: #1a1f28; --fg: #e4e8ef; --muted: #9aa4b5; --line: #2c3340;
+    --accent: #7ea6f2; --box: #f0a63a; --ok: #6fcf9a; --warn: #f0b860; --crit: #f08a82;
+    --ok-bg: #173126; --warn-bg: #3a2c14; --crit-bg: #3b1d1b; --code-bg: #222935;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a1f28; --fg: #e4e8ef; --muted: #9aa4b5; --line: #2c3340;
+  --accent: #7ea6f2; --box: #f0a63a; --ok: #6fcf9a; --warn: #f0b860; --crit: #f08a82;
+  --ok-bg: #173126; --warn-bg: #3a2c14; --crit-bg: #3b1d1b; --code-bg: #222935;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font: 16px/1.6 var(--body); }
+.wrap { max-width: 860px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 72px; display: flex; flex-direction: column; gap: 44px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 2.8rem); font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 1.45rem; font-weight: 800; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+section { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 500 0.75rem/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.lede { font-size: 1.1rem; color: var(--muted); }
+code { font-family: var(--mono); font-size: 0.88em; background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; }
+pre { font: 0.85rem/1.55 var(--mono); background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; margin: 0; }
+pre code { background: none; padding: 0; }
+a { color: var(--accent); }
+
+header { display: flex; flex-direction: column; gap: 14px; border-bottom: 1px solid var(--line); padding-bottom: 28px; }
+.status { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: 500 0.78rem/1 var(--mono); padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); }
+.chip.ok { color: var(--ok); background: var(--ok-bg); border-color: transparent; }
+.chip.warn { color: var(--warn); background: var(--warn-bg); border-color: transparent; }
+
+/* Pipeline: each stage drawn as a detection box with an amber corner label */
+.pipeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 22px 14px; counter-reset: stage; }
+.stage { position: relative; border: 2px solid var(--box); border-radius: 3px; padding: 22px 12px 12px; background: var(--surface); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.stage .tag { position: absolute; top: -11px; left: -2px; background: var(--box); color: var(--bg); font: 600 0.7rem/1 var(--mono); padding: 5px 7px; letter-spacing: 0.04em; }
+.stage strong { font-family: var(--display); font-weight: 600; font-size: 0.98rem; }
+.stage span { font-size: 0.85rem; color: var(--muted); }
+.flow-note { font: 0.8rem/1.4 var(--mono); color: var(--muted); }
+
+.table-box { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 0.72rem/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+tr:last-child td { border-bottom: none; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.best { color: var(--ok); font-weight: 600; }
+
+.bench { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.bar-row { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 14px 16px; }
+.bar-row .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.bar-row .fps { font: 600 1.6rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.bar-row .meta { font: 0.8rem var(--mono); color: var(--muted); }
+.track { height: 8px; background: var(--code-bg); border-radius: 4px; overflow: hidden; }
+.fill { height: 100%; background: var(--accent); border-radius: 4px; }
+
+.risks { display: flex; flex-direction: column; gap: 10px; }
+.risk { display: grid; grid-template-columns: 6px 1fr; gap: 0 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.risk::before { content: ""; background: var(--sev); }
+.risk.crit { --sev: var(--crit); } .risk.warn { --sev: var(--warn); } .risk.low { --sev: var(--ok); }
+.risk > div { padding: 14px 16px 14px 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.risk .head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; justify-content: space-between; }
+.sev { font: 500 0.7rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--sev); }
+.risk p { font-size: 0.93rem; }
+.risk .fix { color: var(--muted); }
+.risk .fix b { color: var(--fg); font-weight: 600; }
+
+.verdict { border: 2px solid var(--accent); border-radius: 8px; padding: 18px 20px; background: var(--surface); display: flex; flex-direction: column; gap: 10px; }
+ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; max-width: 68ch; }
+footer { font: 0.8rem var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+@media (prefers-reduced-motion: no-preference) { .fill { transition: width .6s ease; } }
+.downloads { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; font: 600 0.92rem/1 var(--body); text-decoration: none; padding: 11px 16px; border-radius: 6px; border: 1px solid var(--accent); color: var(--accent); background: var(--surface); }
+.btn.primary { background: var(--accent); color: var(--bg); }
+.btn:hover { filter: brightness(1.08); }
+.btn:focus-visible { outline: 3px solid var(--box); outline-offset: 2px; }
+* { box-sizing: border-box; }
+@media print {
+  :root { --bg: #ffffff; --surface: #ffffff; --fg: #111111; --muted: #4a4f59; color-scheme: light; }
+  .downloads { display: none; }
+  .pipeline { grid-template-columns: repeat(5, 1fr); gap: 18px 8px; }
+  section { break-inside: avoid-page; }
+  .wrap { padding-block: 0; gap: 28px; }
+  .risk, .stage, .bar-row, .verdict, tr, pre { break-inside: avoid; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">novatics · detection · Raspberry Pi 5</span>
+  <h1>Pi 5 Person Detector</h1>
+  <p class="lede">Real-time person detection on the Raspberry Pi 5 CPU. One small model, YOLOX-tiny, finds people in each camera frame; two video checks remove things that only look like people. No accelerator needed, and every part is free for commercial use.</p>
+  <div class="status">
+    <span class="chip ok">~20 FPS live on the CPU</span>
+    <span class="chip ok">Person only</span>
+    <span class="chip ok">Apache 2.0 / MIT / BSD</span>
+  </div>
+  <div class="downloads">
+    <a class="btn primary" href="pi5-person-detector.pdf" download>Download PDF</a>
+    <a class="btn" href="https://github.com/Pratyush150/pi5-yolo11-detection/archive/refs/heads/main.zip">Download project (.zip)</a>
+    <a class="btn" href="https://github.com/Pratyush150/pi5-yolo11-detection">View on GitHub</a>
+  </div>
+</header>
+
+<section>
+  <span class="eyebrow">How it works</span>
+  <h2>From camera frame to "person"</h2>
+  <div class="pipeline">
+    <div class="stage"><span class="tag">1 camera</span><strong>Newest frame</strong><span>Pi HQ camera at 1280×720. A background thread keeps only the latest frame, so output never lags. Optional 180° turn for an upside-down mount</span></div>
+    <div class="stage"><span class="tag">2 model</span><strong>YOLOX-tiny int8</strong><span>Input 416×256, the camera's 16:9 shape, so no grey padding. 29 ms per frame on 3 CPU cores</span></div>
+    <div class="stage"><span class="tag">3 person</span><strong>Person score ≥ 0.45</strong><span>Only the COCO "person" class is read. 0.45 still catches people partly hidden behind objects</span></div>
+    <div class="stage"><span class="tag">4 motion</span><strong>Has it ever moved?</strong><span>A box is accepted once something moved inside it, then followed while the person keeps still. Chairs and coats never move</span></div>
+    <div class="stage"><span class="tag">5 confirm</span><strong>3 of 5 frames</strong><span>A person is reported after appearing in 3 of the last 5 frames, which removes one-frame flickers</span></div>
+  </div>
+  <p class="flow-note">Steps 4 and 5 apply to video. For a single photo, call detect(frame, video=False).</p>
+</section>
+
+<section>
+  <span class="eyebrow">Use it</span>
+  <h2>In an application</h2>
+<pre><code>from person_detector import PersonDetector
+
+detector = PersonDetector()             # load once, one per camera
+people = detector.detect(frame)         # frame: BGR image from OpenCV or the Pi camera
+# [{"label": "person", "conf": 0.92, "box": [x1, y1, x2, y2]}, ...]</code></pre>
+  <p>Options: <code>PersonDetector(conf=0.45, motion=True, confirm=True, threads=3)</code>. To read the camera too, use <code>camera.LatestFrame("auto", rotate=180)</code>. A web UI for testing (<code>app.py</code>) shows the live feed, the people in view and switches for each check.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Measured on this Pi · 2026-10-12</span>
+  <h2>Speed</h2>
+  <div class="bench">
+    <div class="bar-row">
+      <div class="top"><span class="fps">~20 FPS</span><span class="meta">live, camera + UI</span></div>
+      <div class="track"><div class="fill" style="width:100%"></div></div>
+      <span class="meta">Model 29–31 ms per 1280×720 frame</span>
+    </div>
+    <div class="bar-row">
+      <div class="top"><span class="fps">~10 FPS</span><span class="meta">det3's original file</span></div>
+      <div class="track"><div class="fill" style="width:50%"></div></div>
+      <span class="meta">Same weights at 416×416: 84 ms per frame</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Measured accuracy</span>
+  <h2>Does it find people, and only people?</h2>
+  <div class="table-box">
+    <table>
+      <thead><tr><th>Test</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>250 COCO photos of rooms with furniture, no people</td><td>Model alone: a "person" in 4 (a chair back, a wig, clothes, a figurine). Shown as a still scene with the motion check: <b class="best">0</b></td></tr>
+        <tr><td>250 COCO photos with people (IoU ≥ 0.5)</td><td class="num">74% of people ≥ 64 px tall found</td></tr>
+        <tr><td>Person half hidden behind a box, Pi camera, 61 frames</td><td><b class="best">Found in every frame</b>, no false boxes</td></tr>
+        <tr><td>Nearly still person, Pi camera, motion check on</td><td>Accepted within ~1.5 s</td></tr>
+        <tr><td>416×256 model vs det3's 416×416 file, 63 images, 66 people</td><td>Same people found (0 missed, 0 extra), mean box IoU 0.93</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Choices</span>
+  <h2>Why it is built this way</h2>
+  <div class="table-box">
+    <table>
+      <thead><tr><th>Decision</th><th>Reason</th></tr></thead>
+      <tbody>
+        <tr><td>YOLOX-tiny, not YOLO11</td><td>Apache 2.0, free to ship in a product. Ultralytics YOLO11 is AGPL-3.0: a closed product would need a paid licence</td></tr>
+        <tr><td>416×256 input</td><td>Same detail as 416×416 for a 16:9 camera without the grey padding. About 3× faster on the CPU</td></tr>
+        <tr><td>CPU, no accelerator</td><td>Works on any Pi 5. The Hailo-8 is not needed for 20 FPS</td></tr>
+        <tr><td>Motion check, not a higher threshold</td><td>Look-alikes scored 0.66–0.70, as high as partly hidden real people. Movement separates them</td></tr>
+        <tr><td>No box merging</td><td>Merging head and legs boxes lost 65 real people in group photos and helped once. YOLOX never split a person on the camera</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">What to expect</span>
+  <h2>Known limits</h2>
+  <div class="risks">
+    <div class="risk warn"><div>
+      <div class="head"><h3>A completely still person at start-up</h3><span class="sev">Delay</span></div>
+      <p>The motion check needs some movement. Someone already in view and motionless when the app starts is reported once they move slightly, usually within about 1.5 s.</p>
+      <p class="fix"><b>If that matters:</b> use <code>motion=False</code>, which accepts look-alikes again.</p>
+    </div></div>
+    <div class="risk warn"><div>
+      <div class="head"><h3>Moving cameras</h3><span class="sev">Setup</span></div>
+      <p>On a handheld, pan-tilt or drone camera everything moves, so the motion check stops filtering.</p>
+      <p class="fix"><b>Fix:</b> use <code>motion=False</code> there and rely on the 3-of-5-frame confirmation.</p>
+    </div></div>
+    <div class="risk warn"><div>
+      <div class="head"><h3>Small or distant people</h3><span class="sev">Accuracy</span></div>
+      <p>YOLOX-tiny is a small model. People under about 64 px tall in the frame are found less often.</p>
+      <p class="fix"><b>Fix:</b> place the camera closer, or train a larger model on your own footage.</p>
+    </div></div>
+    <div class="risk low"><div>
+      <div class="head"><h3>Heat</h3><span class="sev">Speed</span></div>
+      <p>The model keeps 3 cores busy. Without cooling the Pi 5 slows itself down at about 85 °C.</p>
+      <p class="fix"><b>Fix:</b> fit the Active Cooler and check <code>vcgencmd get_throttled</code>.</p>
+    </div></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Run it</span>
+  <h2>Commands</h2>
+<pre><code>cd ~/detection
+python3 -m venv --system-site-packages .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python app.py --rotate 180         # web UI on http://&lt;pi-ip&gt;:8000
+.venv/bin/python -m pytest -q                # tests</code></pre>
+</section>
+
+<footer>YOLOX-tiny (Megvii, Apache 2.0) · onnxruntime 1.31 (MIT) · OpenCV 5.0 (Apache 2.0) · Flask 3.1 (BSD) · Python 3.13 · Raspberry Pi 5, 16 GB</footer>
+</div>
+</body>
+</html>
