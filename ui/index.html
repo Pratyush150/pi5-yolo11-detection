@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pi 5 Detection Console</title>
+<style>
+/* Layout: live feed on the left, readouts and controls in a right-hand column; stacks on phones */
+:root {
+  --bg: #eef0f3; --panel: #ffffff; --fg: #161b24; --muted: #5d6676; --line: #d8dce3;
+  --accent: #2459c2; --box: #c97a0e; --ok: #1f7a4d; --warn: #a8640a; --crit: #b3322a;
+  --ok-bg: #e3f2ea; --warn-bg: #fbf0dc; --crit-bg: #f9e3e1; --track: #e3e7ee;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1218; --panel: #171b23; --fg: #e3e7ee; --muted: #949eb0; --line: #2a303c;
+    --accent: #7ea6f2; --box: #f0a63a; --ok: #6fcf9a; --warn: #f0b860; --crit: #f08a82;
+    --ok-bg: #16301f; --warn-bg: #382a12; --crit-bg: #3a1c1a; --track: #252b36; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1218; --panel: #171b23; --fg: #e3e7ee; --muted: #949eb0; --line: #2a303c;
+  --accent: #7ea6f2; --box: #f0a63a; --ok: #6fcf9a; --warn: #f0b860; --crit: #f08a82;
+  --ok-bg: #16301f; --warn-bg: #382a12; --crit-bg: #3a1c1a; --track: #252b36; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); }
+.app { max-width: 1400px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 32px; display: flex; flex-direction: column; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+h1 { font-size: 1.25rem; margin: 0; font-weight: 600; }
+h2 { font: 500 0.72rem/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.head-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pill { font: 500 0.78rem/1 var(--mono); padding: 6px 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 7px; }
+.pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.pill.live { color: var(--ok); background: var(--ok-bg); }
+.pill.live::before { animation: blink 1.6s ease-in-out infinite; }
+.pill.starting { color: var(--warn); background: var(--warn-bg); }
+.pill.no_camera, .pill.error, .pill.offline { color: var(--crit); background: var(--crit-bg); }
+@keyframes blink { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .pill.live::before { animation: none; } }
+
+button, .btn { font: 600 0.88rem/1 var(--sans); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; text-decoration: none; }
+button:hover, .btn:hover { border-color: var(--accent); }
+button:focus-visible, .btn:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.feed { position: relative; background: #000; border-radius: 10px; overflow: hidden; aspect-ratio: 16 / 9; max-width: 100%; display: grid; place-items: center; }
+.feed img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.feed .overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: #e3e7ee; background: rgba(10, 12, 16, 0.82); font-size: 0.95rem; }
+.overlay strong { display: block; font-size: 1.1rem; margin-bottom: 6px; }
+.overlay code { font-family: var(--mono); font-size: 0.85em; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 500px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.stat .v { font: 600 1.4rem/1.1 var(--mono); font-variant-numeric: tabular-nums; }
+.stat .k { font-size: 0.78rem; color: var(--muted); }
+
+.objects { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.obj { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: baseline; }
+.obj .name { font-weight: 600; }
+.obj .n { font: 500 0.85rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.obj .bar { grid-column: 1 / -1; height: 6px; background: var(--track); border-radius: 3px; overflow: hidden; }
+.obj .bar span { display: block; height: 100%; background: var(--box); }
+.empty { color: var(--muted); font-size: 0.9rem; }
+
+.control { display: flex; flex-direction: column; gap: 6px; }
+.control label { font-size: 0.85rem; color: var(--muted); display: flex; justify-content: space-between; }
+.control output { font-family: var(--mono); color: var(--fg); }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.control label.check { align-items: center; gap: 12px; color: var(--fg); cursor: pointer; }
+.check small { display: block; color: var(--muted); font-size: 0.78rem; }
+.check input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+.model { font: 500 0.82rem/1 var(--mono); color: var(--muted); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; font: 0.82rem/1.45 var(--mono); }
+.log li { display: grid; grid-template-columns: auto 1fr; gap: 10px; }
+.log time { color: var(--muted); }
+.msg { font-size: 0.82rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="head-left">
+      <h1>Pi 5 Detection Console</h1>
+      <span class="model" id="model"></span>
+      <span id="status" class="pill starting">Starting</span>
+    </div>
+    <div class="row">
+      <button id="pause" type="button">Pause</button>
+      <a class="btn primary" id="snap" href="/api/snapshot.jpg">Save snapshot</a>
+    </div>
+  </header>
+
+  <section class="stats" aria-label="Performance">
+    <div class="stat"><span class="v" id="fps">0.0</span><span class="k">frames per second</span></div>
+    <div class="stat"><span class="v" id="ms">0</span><span class="k">ms per inference</span></div>
+    <div class="stat"><span class="v" id="count">0</span><span class="k">objects in view</span></div>
+    <div class="stat"><span class="v" id="res">–</span><span class="k">camera resolution</span></div>
+  </section>
+
+  <div class="grid">
+    <div class="panel" style="padding:0;border:none;background:none">
+      <div class="feed">
+        <img id="feed" src="/stream" alt="Live camera feed with detection boxes">
+        <div class="overlay" id="overlay"><div><strong>Starting detector</strong><span id="overlay-msg">Loading model...</span></div></div>
+      </div>
+      <p class="msg" id="message"></p>
+    </div>
+
+    <aside class="grid-side" style="display:flex;flex-direction:column;gap:16px;min-width:0">
+      <section class="panel">
+        <h2>In view now</h2>
+        <ul class="objects" id="objects"><li class="empty">Nothing detected yet</li></ul>
+      </section>
+
+      <section class="panel">
+        <h2>Settings</h2>
+        <div class="control">
+          <label for="pconf">Person threshold <output id="pconf-out">0.45</output></label>
+          <input type="range" id="pconf" min="0.05" max="0.95" step="0.05" value="0.45">
+        </div>
+        <div class="control">
+          <label class="check" for="motion"><span>Ignore things that never move <small>(stops chairs, coats and posters being called a person)</small></span>
+            <input type="checkbox" id="motion" checked></label>
+        </div>
+        <div class="control">
+          <label class="check" for="confirm"><span>Confirm over 3 frames <small>(removes one-frame false alarms, ~0.5 s delay)</small></span>
+            <input type="checkbox" id="confirm" checked></label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Change log</h2>
+        <ul class="log" id="log"><li class="empty">No changes yet</li></ul>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let settings = { person_conf: 0.45, motion: true, confirm: true, paused: false };
+let loaded = false;
+const LABELS = { live: "Live", starting: "Starting", no_camera: "No camera", error: "Error", offline: "UI disconnected" };
+
+async function post(body) {
+  try {
+    const r = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    settings = await r.json();
+    renderSettings();
+  } catch (e) { setStatus("offline", "Could not reach the Pi. Check that app.py is still running."); }
+}
+
+function setStatus(status, message) {
+  const el = $("status");
+  el.className = "pill " + status;
+  el.textContent = LABELS[status] || status;
+  $("message").textContent = message || "";
+  const overlay = $("overlay");
+  overlay.hidden = status === "live";
+  if (status === "no_camera") {
+    overlay.querySelector("strong").textContent = "No camera found";
+    $("overlay-msg").innerHTML = "Connect a USB webcam, or connect the Pi camera with the power off and reboot.<br>Check with <code>rpicam-hello --list-cameras</code>";
+  } else if (status !== "live") {
+    overlay.querySelector("strong").textContent = LABELS[status] || "Starting";
+    $("overlay-msg").textContent = message || "";
+  }
+}
+
+function renderSettings() {
+  $("pconf").value = settings.person_conf;
+  $("pconf-out").textContent = Number(settings.person_conf).toFixed(2);
+  $("confirm").checked = settings.confirm;
+  $("motion").checked = settings.motion;
+  $("pause").textContent = settings.paused ? "Resume" : "Pause";
+}
+
+function renderObjects(objects) {
+  const groups = {};
+  objects.forEach(o => { (groups[o.label] ||= []).push(o.conf); });
+  const names = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length || a.localeCompare(b));
+  const ul = $("objects");
+  if (!names.length) { ul.innerHTML = '<li class="empty">Nothing detected</li>'; return; }
+  ul.innerHTML = names.map(n => {
+    const best = Math.max(...groups[n]);
+    return `<li class="obj"><span class="name">${n}</span><span class="n">×${groups[n].length} · ${(best * 100).toFixed(0)}%</span><span class="bar"><span style="width:${(best * 100).toFixed(0)}%"></span></span></li>`;
+  }).join("");
+}
+
+function renderLog(events) {
+  $("log").innerHTML = events.length
+    ? events.map(e => `<li><time>${e.time}</time><span>${e.text}</span></li>`).join("")
+    : '<li class="empty">No changes yet</li>';
+}
+
+async function poll() {
+  try {
+    const s = await (await fetch("/api/state")).json();
+    setStatus(s.status, s.message);
+    $("fps").textContent = s.fps.toFixed(1);
+    $("ms").textContent = s.infer_ms;
+    $("count").textContent = s.objects.length;
+    $("res").textContent = s.frame_size || "–";
+    renderObjects(s.objects);
+    renderLog(s.events);
+    if (!loaded && s.model) {
+      $("model").textContent = s.model;
+      loaded = true;
+      settings = s.settings; renderSettings();
+    }
+  } catch (e) {
+    setStatus("offline", "Lost connection to the Pi. Retrying...");
+  }
+}
+
+$("pconf").addEventListener("input", e => { $("pconf-out").textContent = Number(e.target.value).toFixed(2); });
+$("pconf").addEventListener("change", e => post({ person_conf: +e.target.value }));
+$("confirm").addEventListener("change", e => post({ confirm: e.target.checked }));
+$("motion").addEventListener("change", e => post({ motion: e.target.checked }));
+$("pause").addEventListener("click", () => post({ paused: !settings.paused }));
+// Reconnect the video stream if it drops
+$("feed").addEventListener("error", () => setTimeout(() => { $("feed").src = "/stream?t=" + Date.now(); }, 2000));
+
+poll();
+setInterval(poll, 400);
+</script>
+</body>
+</html>
